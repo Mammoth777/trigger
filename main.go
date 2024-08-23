@@ -33,9 +33,10 @@ func executeLocalShell(w http.ResponseWriter, r *http.Request) {
 	}
 	queryParams := r.URL.Query()
 	runPath := queryParams.Get("run")
+	param := queryParams.Get("param")
 	file := filepath.Join(dir, runPath)
 	fmt.Println("Executing file: ", file)
-	cmd := exec.Command(file)
+	cmd := exec.Command(file, param)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
