@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Server started on port 8080")
+	fmt.Println("Server started on port 52323")
 	http.HandleFunc("/", healthCheck)
 	http.Handle("/execute-local-shell", http.HandlerFunc(executeLocalShell))
 
