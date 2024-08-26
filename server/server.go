@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+var stop chan os.Signal
+var pid int
+
 func StartServer() {
 	server := &http.Server{
 		Addr: ":52323",
@@ -22,14 +25,16 @@ func StartServer() {
 	go func() {
 		fmt.Println("Server started on port 52323")
 		err := server.ListenAndServe()
-		if err != nil {
+		if err != nil && err != http.ErrServerClosed {
 			fmt.Println("Error starting server: ", err)
 			return
 		}
 	}()
 	// 创建一个通道来监听系统中断信号
-	stop := make(chan os.Signal, 1)
+	stop = make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+  pid = os.Getpid()
+	fmt.Println("pid", pid)
 
 	// 阻塞主线程，直到接收到系统中断信号
 	<- stop
@@ -46,6 +51,17 @@ func StartServer() {
 
 func StopServer() {
 	fmt.Println("Server stopped")
+  pcs, err := os.FindProcess(pid)
+  if err != nil {
+    fmt.Println("Error finding process:", err)
+    return
+  }
+  err = pcs.Signal(syscall.SIGTERM)
+  if err != nil {
+    fmt.Println("Error stopping process:", err)
+    return
+  }
+  fmt.Println("Process stopped")
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {
