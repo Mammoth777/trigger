@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -9,13 +10,17 @@ import (
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print the version of the application")
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if v, _ := cmd.Flags().GetBool("version"); v {
+			PrintVersion()
+			os.Exit(0)
+		}
+	}
 }
 
 func PrintVersion() {
-	fmt.Println("Trigger: Server Side Trigger: 1.0.0")
+	fmt.Println("Server Side Trigger: 1.0.0")
 }
-
-
 
 var versionCmd = &cobra.Command{
 	Use:  "version",

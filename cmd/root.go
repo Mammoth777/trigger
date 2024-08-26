@@ -21,7 +21,7 @@ func init() {
 		os.Exit(1)
 	}
 	DefaultConfig.limitDir = dir
-	fmt.Println("Current directory: ", DefaultConfig.limitDir)
+	// fmt.Println("Current directory: ", DefaultConfig.limitDir)
 }
 
 
@@ -29,15 +29,8 @@ var rootCmd = &cobra.Command{
   Use:   "trigger",
   Short: "Trigger is a CLI tool to trigger commands on a remote server",
   Long: `Trigger is a CLI tool to trigger commands on a remote server`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if v, _ := cmd.Flags().GetBool("version"); v {
-			fmt.Println("Trigger: Server Side Trigger: 1.0.0")
-			os.Exit(0)
-		}
-	},
   Run: func(cmd *cobra.Command, args []string) {
-    // Do Stuff Here
-		fmt.Println("Executing command")
+		fmt.Println("Trigger is a CLI tool to trigger commands on a remote server")
   },
 }
 
@@ -47,5 +40,4 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	// server.StartServer()
 }

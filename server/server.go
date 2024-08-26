@@ -1,23 +1,51 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 )
 
 func StartServer() {
-	fmt.Println("Server started on port 52323")
+	server := &http.Server{
+		Addr: ":52323",
+	}
 	http.HandleFunc("/", healthCheck)
 	http.Handle("/execute-local-shell", http.HandlerFunc(executeLocalShell))
+	
+	go func() {
+		fmt.Println("Server started on port 52323")
+		err := server.ListenAndServe()
+		if err != nil {
+			fmt.Println("Error starting server: ", err)
+			return
+		}
+	}()
+	// 创建一个通道来监听系统中断信号
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	err := http.ListenAndServe(":52323", nil)
-	if err != nil {
-		fmt.Println("Error starting server: ", err)
-		return
+	// 阻塞主线程，直到接收到系统中断信号
+	<- stop
+	fmt.Println("Shutting down server...")
+	
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		fmt.Println("Error shutting down server: ", err)
 	}
+	fmt.Println("Server stopped")
+}
+
+func StopServer() {
+	fmt.Println("Server stopped")
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {
