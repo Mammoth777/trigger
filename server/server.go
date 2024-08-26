@@ -1,19 +1,16 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
-	"time"
 )
 
-var stop chan os.Signal
-var pid int
 
 func StartServer() {
 	server := &http.Server{
@@ -21,47 +18,66 @@ func StartServer() {
 	}
 	http.HandleFunc("/", healthCheck)
 	http.Handle("/execute-local-shell", http.HandlerFunc(executeLocalShell))
-	
-	go func() {
-		fmt.Println("Server started on port 52323")
+
+	pid := os.Getpid()
+	go func ()  {
+		fmt.Printf("(%d)Server started on port 52323\n", pid)
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			fmt.Println("Error starting server: ", err)
 			return
 		}
 	}()
-	// 创建一个通道来监听系统中断信号
-	stop = make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-  pid = os.Getpid()
-	fmt.Println("pid", pid)
-
-	// 阻塞主线程，直到接收到系统中断信号
-	<- stop
-	fmt.Println("Shutting down server...")
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		fmt.Println("Error shutting down server: ", err)
+	err := os.WriteFile("server.pid", []byte(fmt.Sprintf("%d", pid)), 0644)
+	if err != nil {
+		fmt.Println("Error writing pid file:", err)
 	}
-	fmt.Println("Server stopped")
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	StopServer()
+}
+
+func StartServerDeamon() {
+	cmd := exec.Command(os.Args[0], "serve")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting server as deamon:", err)
+		return
+	}
 }
 
 func StopServer() {
-	fmt.Println("Server stopped")
-  pcs, err := os.FindProcess(pid)
-  if err != nil {
-    fmt.Println("Error finding process:", err)
-    return
-  }
-  err = pcs.Signal(syscall.SIGTERM)
-  if err != nil {
-    fmt.Println("Error stopping process:", err)
-    return
-  }
-  fmt.Println("Process stopped")
+	pidFile, err := os.ReadFile("server.pid")
+	if err != nil {
+		fmt.Println("Error reading pid file:", err)
+		return
+	}
+	pid, err := strconv.Atoi(string(pidFile))
+	if err != nil {
+		fmt.Println("Error converting pid to int:", err)
+		return
+	}
+	pcs, err := os.FindProcess(pid)
+	if err != nil {
+		fmt.Println("Error finding process:", err)
+		return
+	}
+	err = pcs.Signal(syscall.SIGTERM)
+	if err != nil {
+		fmt.Println("Error stopping process:", err)
+		return
+	}
+	err = os.Remove("server.pid")
+	if err != nil {
+		fmt.Println("Error removing pid file:", err)
+		return
+	}
+	fmt.Println("Process stopped")
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {

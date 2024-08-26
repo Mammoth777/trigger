@@ -20,7 +20,7 @@ var serverCmd = &cobra.Command{
 		deamon, _ := cmd.Flags().GetBool("deamon")
 		stop, _ := cmd.Flags().GetBool("stop")
 		if deamon {
-			go server.StartServer()
+			server.StartServerDeamon()
 			return
 		}
 		if stop {
