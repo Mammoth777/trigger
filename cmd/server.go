@@ -23,7 +23,7 @@ var serverCmd = &cobra.Command{
 			server.StartServerDeamon()
 			return
 		}
-		if stop {
+		if stop {			
 			server.StopServer()
 			return
 		}

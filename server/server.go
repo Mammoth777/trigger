@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -10,6 +11,20 @@ import (
 	"strconv"
 	"syscall"
 )
+
+func recordPid(pid int) {
+	file, err := os.OpenFile("server.pid", os.O_CREATE|os.O_WRONLY, 0644);
+	if err != nil {
+		log.Println("Error creating pid file:", err)
+		return
+	}
+	defer file.Close()
+	_, err = file.WriteString(fmt.Sprintf("%d", pid))
+	if err != nil {
+		log.Println("Error writing pid file:", err)
+	}
+	log.Printf("Pid file created: %d\n", pid)
+}
 
 
 func StartServer() {
@@ -28,10 +43,8 @@ func StartServer() {
 			return
 		}
 	}()
-	err := os.WriteFile("server.pid", []byte(fmt.Sprintf("%d", pid)), 0644)
-	if err != nil {
-		fmt.Println("Error writing pid file:", err)
-	}
+	
+	recordPid(pid)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -54,7 +67,7 @@ func StartServerDeamon() {
 func StopServer() {
 	pidFile, err := os.ReadFile("server.pid")
 	if err != nil {
-		fmt.Println("Error reading pid file:", err)
+		log.Println("Error reading pid file:", err)
 		return
 	}
 	pid, err := strconv.Atoi(string(pidFile))
@@ -87,7 +100,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 func inLimitDir(target string) bool {
 	limitDir, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Error getting current directory:", err)
+		log.Println("Error getting current directory:", err)
 		return false
 	}
 	return filepath.HasPrefix(target, limitDir)
@@ -96,27 +109,47 @@ func inLimitDir(target string) bool {
 func executeLocalShell(w http.ResponseWriter, r *http.Request) {
 	dir, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Error getting current directory:", err)
-		w.Write([]byte("Error getting current directory"))
+		log.Println("Error getting current directory:", err)
+		w.Write([]byte("Error getting current directory\n"))
 		return
 	}
 	queryParams := r.URL.Query()
 	runPath := queryParams.Get("run")
 	param := queryParams.Get("param")
 	file := filepath.Join(dir, runPath)
-	if !inLimitDir(file) {
-		w.Write([]byte("Error: File not in current directory"))
-		fmt.Println("Error: File not in current directory")
+	if runPath == "" {
+		w.Write([]byte("Error: No file specified\n"))
+		log.Println("Error: No file specified")
 		return
 	}
-	fmt.Println("Executing file: ", file)
+	if !inLimitDir(file) {
+		w.Write([]byte("Error: File not in current directory\n"))
+		log.Println("Error: File not in current directory")
+		return
+	}
+	log.Printf("Executing file: %s\n", file)
 	cmd := exec.Command(file, param)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// 确保目录存在
+	logDir := "logs"
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+			log.Println("Error creating directory:", err)
+			return
+	}
+	outputFile, err := os.OpenFile("logs/exec-output.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		w.Write([]byte("Error opening output file: " + err.Error() + "\n"))
+		log.Println("Error opening output file: ", err)
+		return
+	}
+	defer outputFile.Close()
+	cmd.Stdout = outputFile
+	cmd.Stderr = outputFile
+	log.Printf("Executing: %s %s \n", file, param)
 	err = cmd.Run()
 	if err != nil {
-		w.Write([]byte("Error executing command" + err.Error()))
-		fmt.Println("Error executing command: ", err)
+		w.Write([]byte("Error executing command: " + err.Error() + "\n"))
+		log.Println("Error executing command: ", err)
+		return
 	}
-	w.Write([]byte("Command executed"))
+	w.Write([]byte("Command executed\n"))
 }

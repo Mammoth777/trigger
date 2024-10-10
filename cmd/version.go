@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 )
-
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print the version of the application")
